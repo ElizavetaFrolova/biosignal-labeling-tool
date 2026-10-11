@@ -14,6 +14,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from pathlib import Path
+
+import wfdb
+
 
 class SetupWindow(QWidget):
     create_project = Signal(dict)
@@ -116,6 +120,10 @@ class SetupWindow(QWidget):
         self.dataset_edit = QLineEdit()
         self.dataset_edit.setPlaceholderText(
             "Путь к исходным данным..."
+        )
+
+        self.dataset_edit.editingFinished.connect(
+            self.inspect_dataset
         )
 
         dataset_folder_button = QPushButton(
@@ -278,11 +286,9 @@ class SetupWindow(QWidget):
         main_layout.addLayout(navigation)
 
     def select_project_parent(self):
-        directory = (
-            QFileDialog.getExistingDirectory(
-                self,
-                "Куда сохранить проект",
-            )
+        directory = QFileDialog.getExistingDirectory(
+            self,
+            "Куда сохранить проект",
         )
 
         if directory:
@@ -303,6 +309,8 @@ class SetupWindow(QWidget):
                 directory
             )
 
+            self.inspect_dataset()
+
     def select_dataset_file(self):
         file_name, _ = (
             QFileDialog.getOpenFileName(
@@ -315,6 +323,8 @@ class SetupWindow(QWidget):
             self.dataset_edit.setText(
                 file_name
             )
+
+            self.inspect_dataset()
 
     def create(self):
         project_name = (
@@ -373,3 +383,55 @@ class SetupWindow(QWidget):
         self.create_project.emit(
             settings
         )
+
+
+    def inspect_dataset(self):
+        dataset_path = self.dataset_edit.text().strip()
+
+        if not dataset_path:
+            return
+
+        path = Path(dataset_path)
+
+        header_file = None
+
+        if path.is_dir():
+            header_file = next(
+                path.rglob("*.hea"),
+                None,
+            )
+
+        elif path.suffix.lower() == ".hea":
+            header_file = path
+
+        if header_file is None:
+            return
+
+        try:
+            record_path = header_file.with_suffix("")
+
+            header = wfdb.rdheader(
+                str(record_path)
+            )
+
+        except Exception:
+            return
+
+        self.format_combo.blockSignals(True)
+        self.format_combo.setCurrentText("WFDB")
+        self.format_combo.blockSignals(False)
+
+        self.fs_spin.setValue(
+            int(round(header.fs))
+        )
+
+        self.channel_combo.clear()
+
+        self.channel_combo.addItems(
+            header.sig_name
+        )
+
+        if "II" in header.sig_name:
+            self.channel_combo.setCurrentText("II")
+
+    

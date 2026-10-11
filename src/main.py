@@ -12,6 +12,8 @@ from setup_window import SetupWindow
 from start_page import StartPage
 from storage.project_store import ProjectStore
 
+from loaders.loader_factory import create_loader
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -84,12 +86,38 @@ class MainWindow(QMainWindow):
             "project_name"
         ]
 
+        # Сначала проверяем датасет.
+        try:
+            loader = create_loader(
+                settings
+            )
+
+        except Exception as error:
+            QMessageBox.critical(
+                self,
+                "Ошибка датасета",
+                str(error),
+            )
+            return
+
+        if len(loader) == 0:
+            QMessageBox.warning(
+                self,
+                "Нет сигналов",
+                "В выбранных данных не найдено "
+                "подходящих сигналов.",
+            )
+            return
+
+        # И только если датасет нормальный,
+        # создаём проект и базу.
         try:
             store = ProjectStore.create(
                 parent_dir,
                 project_name,
                 settings,
             )
+
         except Exception as error:
             QMessageBox.critical(
                 self,
@@ -99,7 +127,8 @@ class MainWindow(QMainWindow):
             return
 
         self.open_labeling_page(
-            store
+            store,
+            loader,
         )
 
     def open_project(self, project_dir):
@@ -119,7 +148,7 @@ class MainWindow(QMainWindow):
             store
         )
 
-    def open_labeling_page(self, store):
+    def open_labeling_page(self, store, loader=None,):
         if self.project_store is not None:
             self.project_store.close()
 
@@ -129,6 +158,41 @@ class MainWindow(QMainWindow):
             self.project_store
             .get_settings()
         )
+
+        # При открытии существующего проекта
+        # loader ещё не создан.
+        if loader is None:
+            try:
+                loader = create_loader(
+                    settings
+                )
+
+            except Exception as error:
+                QMessageBox.critical(
+                    self,
+                    "Ошибка загрузки датасета",
+                    str(error),
+                )
+
+                self.project_store.close()
+                self.project_store = None
+
+                self.show_start_page()
+                return
+
+        if len(loader) == 0:
+            QMessageBox.warning(
+                self,
+                "Нет сигналов",
+                "В выбранном датасете "
+                "не найдено подходящих сигналов.",
+            )
+
+            self.project_store.close()
+            self.project_store = None
+
+            self.show_start_page()
+            return
 
         if self.labeling_page is not None:
             self.stack.removeWidget(
@@ -140,6 +204,7 @@ class MainWindow(QMainWindow):
         self.labeling_page = LabelingWindow(
             settings,
             self.project_store,
+            loader,
         )
 
         self.stack.addWidget(

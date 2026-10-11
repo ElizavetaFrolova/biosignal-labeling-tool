@@ -16,20 +16,19 @@ from models.signal_record import SignalRecord
 
 
 class LabelingWindow(QWidget):
-    def __init__(self, settings, project_store):
+    def __init__(self, settings, project_store, loader,):
         super().__init__()
 
         self.settings = settings
 
         self.project_store = project_store
 
-        # Пока тестовые записи.
-        # Потом вместо этого здесь будет настоящий Loader.
-        self.records = self.create_test_records()
+        self.loader = loader
+
 
         self.current_index = self.project_store.get_current_index()
 
-        if self.current_index >= len(self.records):
+        if self.current_index >= len(self.loader):
             self.current_index = 0
 
 
@@ -216,7 +215,7 @@ class LabelingWindow(QWidget):
         goto_label = QLabel("Перейти к записи:")
 
         self.goto_edit = QLineEdit()
-        self.goto_edit.setPlaceholderText("Например: test_0003")
+        self.goto_edit.setPlaceholderText("Введите ID записи")
         self.goto_edit.setMinimumHeight(36)
 
         self.goto_edit.setStyleSheet(
@@ -250,48 +249,24 @@ class LabelingWindow(QWidget):
 
         self.show_current_record()
 
-    def create_test_records(self):
-        fs = self.settings["fs"]
-        duration = self.settings["window_seconds"]
-
-        time = np.arange(
-            int(fs * duration)
-        ) / fs
-
-        records = []
-
-        for index in range(10):
-            frequency = 1.0 + index * 0.1
-
-            signal = np.sin(
-                2 * np.pi * frequency * time
-            )
-
-            record = SignalRecord(
-                record_id=f"test_{index + 1:04d}",
-                signal=signal,
-                fs=fs,
-                channel_name="test",
-            )
-
-            records.append(record)
-
-        return records
-
     def show_current_record(self):
 
         self.project_store.set_current_index(
         self.current_index
         )
 
-        record = self.records[self.current_index]
+        record = self.loader.load(
+            self.current_index
+        )
+
+        self.current_record = record
 
         self.record_label.setText(
             f"Запись: {record.record_id}"
         )
 
         self.progress_label.setText(
-            f"{self.current_index + 1} / {len(self.records)}"
+            f"{self.current_index + 1} / {len(self.loader)}"
         )
 
         duration = len(record.signal) / record.fs
@@ -326,7 +301,7 @@ class LabelingWindow(QWidget):
         )
 
     def assign_class(self, class_id):
-        record = self.records[self.current_index]
+        record = self.current_record
 
         self.project_store.assign_label(
             record.record_id,
@@ -337,7 +312,7 @@ class LabelingWindow(QWidget):
         self.next_record()
 
     def skip_record(self):
-        record = self.records[self.current_index]
+        record = self.current_record
 
         self.project_store.mark_skipped(
             record.record_id
@@ -346,7 +321,7 @@ class LabelingWindow(QWidget):
         self.next_record()
 
     def next_record(self):
-        if self.current_index < len(self.records) - 1:
+        if self.current_index < len(self.loader) - 1:
             self.current_index += 1
 
             self.project_store.set_current_index(
@@ -372,28 +347,34 @@ class LabelingWindow(QWidget):
             self.show_current_record()
 
     def go_to_record(self):
-        record_id = self.goto_edit.text().strip()
-
-        for index, record in enumerate(self.records):
-            if record.record_id == record_id:
-                self.current_index = index
-
-                self.project_store.set_current_index(
-                    index
-                )
-
-                self.show_current_record()
-                self.goto_edit.clear()
-                return
-
-        QMessageBox.warning(
-            self,
-            "Запись не найдена",
-            f"Запись с ID '{record_id}' не найдена.",
+        record_id = (
+            self.goto_edit.text().strip()
         )
 
+        index = self.loader.find_index(
+            record_id
+        )
+
+        if index is None:
+            QMessageBox.warning(
+                self,
+                "Запись не найдена",
+                f"Запись с ID "
+                f"'{record_id}' не найдена.",
+            )
+            return
+
+        self.current_index = index
+
+        self.project_store.set_current_index(
+            index
+        )
+
+        self.show_current_record()
+        self.goto_edit.clear()
+
     def update_class_label(self):
-        record = self.records[self.current_index]
+        record = self.current_record
 
         class_names = {
             0: "0 — Чистый",

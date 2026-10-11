@@ -16,21 +16,23 @@ from models.signal_record import SignalRecord
 
 
 class LabelingWindow(QWidget):
-    def __init__(self, settings):
+    def __init__(self, settings, project_store):
         super().__init__()
 
         self.settings = settings
+
+        self.project_store = project_store
 
         # Пока тестовые записи.
         # Потом вместо этого здесь будет настоящий Loader.
         self.records = self.create_test_records()
 
-        self.current_index = 0
+        self.current_index = self.project_store.get_current_index()
 
-        # Здесь пока только временно храним разметку в памяти.
-        # Например:
-        # "test_0001": 2
-        self.labels = {}
+        if self.current_index >= len(self.records):
+            self.current_index = 0
+
+
 
         self.setStyleSheet("background-color: white;")
 
@@ -277,6 +279,11 @@ class LabelingWindow(QWidget):
         return records
 
     def show_current_record(self):
+
+        self.project_store.set_current_index(
+        self.current_index
+        )
+
         record = self.records[self.current_index]
 
         self.record_label.setText(
@@ -321,18 +328,31 @@ class LabelingWindow(QWidget):
     def assign_class(self, class_id):
         record = self.records[self.current_index]
 
-        # Если запись уже была размечена,
-        # значение просто заменится.
-        self.labels[record.record_id] = class_id
+        self.project_store.assign_label(
+            record.record_id,
+            record.signal,
+            class_id,
+        )
 
         self.next_record()
 
     def skip_record(self):
+        record = self.records[self.current_index]
+
+        self.project_store.mark_skipped(
+            record.record_id
+        )
+
         self.next_record()
 
     def next_record(self):
         if self.current_index < len(self.records) - 1:
             self.current_index += 1
+
+            self.project_store.set_current_index(
+                self.current_index
+            )
+
             self.show_current_record()
         else:
             QMessageBox.information(
@@ -341,11 +361,14 @@ class LabelingWindow(QWidget):
                 "Вы дошли до последней записи.",
             )
 
-            self.update_class_label()
-
     def previous_record(self):
         if self.current_index > 0:
             self.current_index -= 1
+
+            self.project_store.set_current_index(
+                self.current_index
+            )
+
             self.show_current_record()
 
     def go_to_record(self):
@@ -354,6 +377,11 @@ class LabelingWindow(QWidget):
         for index, record in enumerate(self.records):
             if record.record_id == record_id:
                 self.current_index = index
+
+                self.project_store.set_current_index(
+                    index
+                )
+
                 self.show_current_record()
                 self.goto_edit.clear()
                 return
@@ -374,16 +402,38 @@ class LabelingWindow(QWidget):
             3: "3 — Нечитаемый",
         }
 
-        if record.record_id in self.labels:
-            class_id = self.labels[record.record_id]
+        class_id = self.project_store.get_label(
+            record.record_id
+        )
 
-            self.current_class_label.setText(
-                f"Текущий класс: {class_names[class_id]}"
+        status = self.project_store.get_status(
+            record.record_id
+        )
+
+        if class_id is not None:
+            text = (
+                "Текущий класс: "
+                f"{class_names[class_id]}"
             )
+
+        elif status == "skipped":
+            text = "Текущий статус: пропущен"
+
         else:
-            self.current_class_label.setText(
-                "Текущий класс: не размечен"
-            )
+            text = "Текущий класс: не размечен"
+
+        progress = self.project_store.get_progress()
+
+        text += (
+            f"    |    Размечено: "
+            f"{progress['labeled']}"
+            f"    Пропущено: "
+            f"{progress['skipped']}"
+        )
+
+        self.current_class_label.setText(
+            text
+        )
 
     @staticmethod
     def button_style(background, text_color):

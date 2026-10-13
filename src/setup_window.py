@@ -24,6 +24,8 @@ import pandas as pd
 
 import pyedflib
 
+from scipy.io import loadmat
+
 
 class SetupWindow(QWidget):
     create_project = Signal(dict)
@@ -786,7 +788,87 @@ class SetupWindow(QWidget):
                             fs
                         )
 
-            
+        # ---------------- MAT ----------------
+
+        mat_file = None
+
+        if path.is_dir():
+            mat_file = next(
+                path.rglob("*.mat"),
+                None,
+            )
+
+        elif path.suffix.lower() == ".mat":
+            mat_file = path
+
+        if mat_file is not None:
+            try:
+                data = loadmat(
+                    mat_file,
+                    squeeze_me=True,
+                )
+
+            except Exception:
+                return
+
+            self.format_combo.setCurrentText(
+                "MAT"
+            )
+
+            self.channel_combo.clear()
+
+            fs_names = {
+                "fs",
+                "sampling_rate",
+                "sample_rate",
+            }
+
+            detected_fs = None
+
+            for name, value in data.items():
+                # MATLAB добавляет служебные поля
+                if name.startswith("__"):
+                    continue
+
+                array = np.asarray(value)
+
+                if name.lower() in fs_names:
+                    if array.size == 1:
+                        detected_fs = float(
+                            array.reshape(-1)[0]
+                        )
+
+                    continue
+
+                if array.ndim == 1:
+                    if array.size > 10:
+                        self.channel_combo.addItem(
+                            name
+                        )
+
+                elif array.ndim == 2:
+                    rows, columns = array.shape
+
+                    channel_count = min(
+                        rows,
+                        columns,
+                    )
+
+                    for channel_index in range(
+                        channel_count
+                    ):
+                        self.channel_combo.addItem(
+                            f"{name}[{channel_index}]"
+                        )
+
+            if detected_fs is not None:
+                self.set_fs_auto(
+                    detected_fs
+                )
+            else:
+                self.set_fs_manual()
+
+            return    
 
             return
 

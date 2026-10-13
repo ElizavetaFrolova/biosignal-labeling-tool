@@ -10,6 +10,8 @@ from loaders.npz_loader import NPZLoader
 
 from loaders.edf_loader import EDFLoader
 
+from loaders.mat_loader import MATLoader
+
 
 def create_loader(settings):
     dataset_path = Path(
@@ -37,6 +39,9 @@ def create_loader(settings):
             elif suffix == ".edf":
                 data_format = "EDF"
 
+            elif suffix == ".mat":
+                data_format = "MAT"
+
         elif dataset_path.is_dir():
             if any(dataset_path.rglob("*.hea")):
                 data_format = "WFDB"
@@ -52,6 +57,9 @@ def create_loader(settings):
 
             elif any(dataset_path.rglob("*.edf")):
                 data_format = "EDF"
+
+            elif any(dataset_path.rglob("*.mat")):
+                data_format = "MAT"
 
     if data_format == "WFDB":
         return WFDBLoader(
@@ -117,6 +125,21 @@ def create_loader(settings):
             dataset_path=settings[
                 "dataset_path"
             ],
+            channel=settings["channel"],
+            window_seconds=settings[
+                "window_seconds"
+            ],
+            step_seconds=settings[
+                "step_seconds"
+            ],
+        )
+
+    if data_format == "MAT":
+        return MATLoader(
+            dataset_path=settings[
+                "dataset_path"
+            ],
+            fs=settings["fs"],
             channel=settings["channel"],
             window_seconds=settings[
                 "window_seconds"

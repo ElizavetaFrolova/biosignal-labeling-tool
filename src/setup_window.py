@@ -22,6 +22,8 @@ import numpy as np
 
 import pandas as pd
 
+import pyedflib
+
 
 class SetupWindow(QWidget):
     create_project = Signal(dict)
@@ -630,6 +632,60 @@ class SetupWindow(QWidget):
                 )
             else:
                 self.set_fs_manual()
+
+            return
+
+        # ---------------- EDF ----------------
+
+        edf_file = None
+
+        if path.is_dir():
+            edf_file = next(
+                path.rglob("*.edf"),
+                None,
+            )
+
+        elif path.suffix.lower() == ".edf":
+            edf_file = path
+
+        if edf_file is not None:
+            try:
+                reader = pyedflib.EdfReader(
+                    str(edf_file)
+                )
+
+                channel_names = (
+                    reader.getSignalLabels()
+                )
+
+                if not channel_names:
+                    reader.close()
+                    return
+
+                self.format_combo.setCurrentText(
+                    "EDF"
+                )
+
+                self.channel_combo.clear()
+
+                self.channel_combo.addItems(
+                    channel_names
+                )
+
+                channel_index = 0
+
+                fs = reader.getSampleFrequency(
+                    channel_index
+                )
+
+                self.set_fs_auto(
+                    fs
+                )
+
+                reader.close()
+
+            except Exception:
+                return
 
             return
 

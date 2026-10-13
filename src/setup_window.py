@@ -425,8 +425,8 @@ class SetupWindow(QWidget):
                 "WFDB"
             )
 
-            self.fs_spin.setValue(
-                int(round(header.fs))
+            self.set_fs_auto(
+                header.fs
             )
 
             self.channel_combo.clear()
@@ -468,6 +468,8 @@ class SetupWindow(QWidget):
             self.format_combo.setCurrentText(
                 "NPY"
             )
+
+            self.set_fs_manual()
 
             self.channel_combo.clear()
 
@@ -587,8 +589,37 @@ class SetupWindow(QWidget):
 
                         fs = 1.0 / dt
 
-                        self.fs_spin.setValue(
-                            int(round(fs))
+                        self.set_fs_auto(
+                            fs
                         )
 
             return
+
+
+    def set_fs_auto(self, value):
+        self.fs_spin.setValue(
+            int(round(value))
+        )
+
+        self.fs_spin.setReadOnly(True)
+
+        self.fs_spin.setStyleSheet(
+            """
+            QSpinBox {
+                background-color: #F3F4F6;
+                color: #555555;
+            }
+            """
+        )
+
+    def set_fs_manual(self):
+        self.fs_spin.setReadOnly(False)
+
+        self.fs_spin.setStyleSheet(
+            """
+            QSpinBox {
+                background-color: white;
+                color: #222222;
+            }
+            """
+        )

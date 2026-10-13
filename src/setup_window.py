@@ -18,6 +18,10 @@ from pathlib import Path
 
 import wfdb
 
+import numpy as np
+
+import pandas as pd
+
 
 class SetupWindow(QWidget):
     create_project = Signal(dict)
@@ -393,6 +397,8 @@ class SetupWindow(QWidget):
 
         path = Path(dataset_path)
 
+        # ---------------- WFDB ----------------
+
         header_file = None
 
         if path.is_dir():
@@ -404,34 +410,185 @@ class SetupWindow(QWidget):
         elif path.suffix.lower() == ".hea":
             header_file = path
 
-        if header_file is None:
-            return
+        if header_file is not None:
+            try:
+                record_path = header_file.with_suffix("")
 
-        try:
-            record_path = header_file.with_suffix("")
+                header = wfdb.rdheader(
+                    str(record_path)
+                )
 
-            header = wfdb.rdheader(
-                str(record_path)
+            except Exception:
+                return
+
+            self.format_combo.setCurrentText(
+                "WFDB"
             )
 
-        except Exception:
+            self.fs_spin.setValue(
+                int(round(header.fs))
+            )
+
+            self.channel_combo.clear()
+
+            self.channel_combo.addItems(
+                header.sig_name
+            )
+
+            if "II" in header.sig_name:
+                self.channel_combo.setCurrentText(
+                    "II"
+                )
+
             return
 
-        self.format_combo.blockSignals(True)
-        self.format_combo.setCurrentText("WFDB")
-        self.format_combo.blockSignals(False)
+        # ---------------- NPY ----------------
 
-        self.fs_spin.setValue(
-            int(round(header.fs))
-        )
+        npy_file = None
 
-        self.channel_combo.clear()
+        if path.is_dir():
+            npy_file = next(
+                path.rglob("*.npy"),
+                None,
+            )
 
-        self.channel_combo.addItems(
-            header.sig_name
-        )
+        elif path.suffix.lower() == ".npy":
+            npy_file = path
 
-        if "II" in header.sig_name:
-            self.channel_combo.setCurrentText("II")
+        if npy_file is not None:
+            try:
+                data = np.load(
+                    npy_file,
+                    mmap_mode="r",
+                )
 
-    
+            except Exception:
+                return
+
+            self.format_combo.setCurrentText(
+                "NPY"
+            )
+
+            self.channel_combo.clear()
+
+            if data.ndim == 1:
+                self.channel_combo.addItem(
+                    "single"
+                )
+
+            elif data.ndim == 2:
+                rows, columns = data.shape
+
+                channel_count = min(
+                    rows,
+                    columns,
+                )
+
+                for index in range(channel_count):
+                    self.channel_combo.addItem(
+                        str(index)
+                    )
+
+            else:
+                self.channel_combo.addItem(
+                    "Неподдерживаемая форма"
+                )
+
+        # ---------------- CSV ----------------
+
+        csv_file = None
+
+        if path.is_dir():
+            csv_file = next(
+                path.rglob("*.csv"),
+                None,
+            )
+
+        elif path.suffix.lower() == ".csv":
+            csv_file = path
+
+        if csv_file is not None:
+            try:
+                dataframe = pd.read_csv(
+                    csv_file,
+                    nrows=100,
+                )
+
+            except Exception:
+                return
+
+            self.format_combo.setCurrentText(
+                "CSV"
+            )
+
+            self.channel_combo.clear()
+
+            time_columns = {
+                "time",
+                "timestamp",
+                "t",
+                "seconds",
+                "sec",
+            }
+
+            signal_columns = []
+            detected_time_column = None
+
+            for column in dataframe.columns:
+                column_name = str(column)
+
+                if not pd.api.types.is_numeric_dtype(
+                    dataframe[column]
+                ):
+                    continue
+
+                if column_name.lower() in time_columns:
+                    detected_time_column = column
+                    continue
+
+                signal_columns.append(
+                    column_name
+                )
+
+            self.channel_combo.addItems(
+                signal_columns
+            )
+
+            # Если есть ECG, выбираем его автоматически
+            if "ECG" in signal_columns:
+                self.channel_combo.setCurrentText(
+                    "ECG"
+                )
+
+            # Если нашли столбец времени,
+            # пытаемся автоматически определить fs
+            if detected_time_column is not None:
+                time_values = dataframe[
+                    detected_time_column
+                ].to_numpy(
+                    dtype=float
+                )
+
+                if len(time_values) >= 2:
+                    time_differences = np.diff(
+                        time_values
+                    )
+
+                    time_differences = (
+                        time_differences[
+                            time_differences > 0
+                        ]
+                    )
+
+                    if len(time_differences) > 0:
+                        dt = np.median(
+                            time_differences
+                        )
+
+                        fs = 1.0 / dt
+
+                        self.fs_spin.setValue(
+                            int(round(fs))
+                        )
+
+            return

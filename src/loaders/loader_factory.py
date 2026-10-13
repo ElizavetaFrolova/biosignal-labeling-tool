@@ -4,6 +4,8 @@ from loaders.wfdb_loader import WFDBLoader
 
 from loaders.npy_loader import NPYLoader
 
+from loaders.csv_loader import CSVLoader
+
 
 def create_loader(settings):
     dataset_path = Path(
@@ -22,12 +24,18 @@ def create_loader(settings):
             elif suffix == ".npy":
                 data_format = "NPY"
 
+            elif suffix == ".csv":
+                data_format = "CSV"
+
         elif dataset_path.is_dir():
             if any(dataset_path.rglob("*.hea")):
                 data_format = "WFDB"
 
             elif any(dataset_path.rglob("*.npy")):
                 data_format = "NPY"
+
+            elif any(dataset_path.rglob("*.csv")):
+                    data_format = "CSV"
 
     if data_format == "WFDB":
         return WFDBLoader(
@@ -49,6 +57,22 @@ def create_loader(settings):
                 "dataset_path"
             ],
             fs=settings["fs"],
+            channel=settings["channel"],
+            window_seconds=settings[
+                "window_seconds"
+            ],
+            step_seconds=settings[
+                "step_seconds"
+            ],
+        )
+
+    if data_format == "CSV":
+        return CSVLoader(
+            dataset_path=settings[
+                "dataset_path"
+            ],
+            fs=settings["fs"],
+            channel=settings["channel"],
             window_seconds=settings[
                 "window_seconds"
             ],

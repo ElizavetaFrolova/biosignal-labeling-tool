@@ -20,12 +20,14 @@ class NPYLoader(BaseLoader):
         self,
         dataset_path,
         fs,
+        channel,
         window_seconds,
         step_seconds,
     ):
         self.dataset_path = Path(dataset_path)
 
         self.fs = float(fs)
+        self.channel = channel
         self.window_seconds = float(window_seconds)
         self.step_seconds = float(step_seconds)
 
@@ -136,14 +138,15 @@ class NPYLoader(BaseLoader):
         if data.ndim == 1:
             return data.shape[0]
 
-        # Разрешаем также (1, N) и (N, 1)
-        if data.ndim == 2 and 1 in data.shape:
-            return max(data.shape)
+        if data.ndim == 2:
+            return max(
+                data.shape
+            )
 
         raise ValueError(
             f"Файл '{file_path.name}' имеет форму "
             f"{data.shape}. Пока поддерживаются "
-            "одноканальные NPY: (N,), (1, N) или (N, 1)."
+            "одномерные и двумерные NPY-массивы."
         )
 
     def _make_record_id(
@@ -163,15 +166,48 @@ class NPYLoader(BaseLoader):
             .replace("/", "__")
         )
 
-    @staticmethod
-    def _to_1d(data):
+    def _get_channel(self, data):
         if data.ndim == 1:
             return data
 
-        if data.shape[0] == 1:
-            return data[0]
+        rows, columns = data.shape
 
-        return data[:, 0]
+        # Предполагаем, что меньшая размерность —
+        # количество каналов.
+        if rows <= columns:
+            channel_count = rows
+            channel_axis = 0
+        else:
+            channel_count = columns
+            channel_axis = 1
+
+        if self.channel in (
+            "single",
+            "Автоматически",
+        ):
+            channel_index = 0
+        else:
+            channel_index = int(
+                self.channel
+            )
+
+        if channel_index >= channel_count:
+            raise ValueError(
+                f"Канал {channel_index} отсутствует. "
+                f"В файле найдено каналов: "
+                f"{channel_count}."
+            )
+
+        if channel_axis == 0:
+            return data[
+                channel_index,
+                :
+            ]
+
+        return data[
+            :,
+            channel_index
+        ]
 
     def __len__(self):
         return len(self.windows)
@@ -184,7 +220,7 @@ class NPYLoader(BaseLoader):
             mmap_mode="r",
         )
 
-        signal = self._to_1d(data)
+        signal = self._get_channel(data)
 
         signal = np.asarray(
             signal[
@@ -197,7 +233,7 @@ class NPYLoader(BaseLoader):
             record_id=window.record_id,
             signal=signal,
             fs=self.fs,
-            channel_name="single",
+            channel_name=str(self.channel),
         )
 
     def find_index(self, record_id):

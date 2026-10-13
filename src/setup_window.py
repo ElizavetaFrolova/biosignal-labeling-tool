@@ -166,6 +166,7 @@ class SetupWindow(QWidget):
                 "WFDB",
                 "CSV",
                 "NPY",
+                "NPZ",
                 "EDF",
                 "MAT",
             ]
@@ -547,6 +548,91 @@ class SetupWindow(QWidget):
                     "Неподдерживаемая форма"
                 )
 
+        # ---------------- NPZ ----------------
+
+        npz_file = None
+
+        if path.is_dir():
+            npz_file = next(
+                path.rglob("*.npz"),
+                None,
+            )
+
+        elif path.suffix.lower() == ".npz":
+            npz_file = path
+
+        if npz_file is not None:
+            try:
+                data = np.load(
+                    npz_file
+                )
+
+            except Exception:
+                return
+
+            self.format_combo.setCurrentText(
+                "NPZ"
+            )
+
+            self.channel_combo.clear()
+
+            # В NPZ fs иногда хранится отдельно.
+            fs_names = {
+                "fs",
+                "sampling_rate",
+                "sample_rate",
+            }
+
+            detected_fs = None
+
+            for key in data.files:
+                array = np.asarray(
+                    data[key]
+                )
+
+                if key.lower() in fs_names:
+                    if array.size == 1:
+                        detected_fs = float(
+                            array.reshape(-1)[0]
+                        )
+
+                    continue
+
+                # Одномерный сигнал
+                if array.ndim == 1:
+                    # Не предлагаем маленькие служебные массивы
+                    if array.size > 10:
+                        self.channel_combo.addItem(
+                            key
+                        )
+
+                # Многоканальный сигнал
+                elif array.ndim == 2:
+                    rows, columns = array.shape
+
+                    channel_count = min(
+                        rows,
+                        columns,
+                    )
+
+                    for channel_index in range(
+                        channel_count
+                    ):
+                        self.channel_combo.addItem(
+                            f"{key}[{channel_index}]"
+                        )
+
+            data.close()
+
+            if detected_fs is not None:
+                self.set_fs_auto(
+                    detected_fs
+                )
+            else:
+                self.set_fs_manual()
+
+            return
+
         # ---------------- CSV ----------------
 
         csv_file = None
@@ -643,6 +729,8 @@ class SetupWindow(QWidget):
                         self.set_fs_auto(
                             fs
                         )
+
+            
 
             return
 

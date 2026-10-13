@@ -6,6 +6,8 @@ from loaders.npy_loader import NPYLoader
 
 from loaders.csv_loader import CSVLoader
 
+from loaders.npz_loader import NPZLoader
+
 
 def create_loader(settings):
     dataset_path = Path(
@@ -27,6 +29,9 @@ def create_loader(settings):
             elif suffix == ".csv":
                 data_format = "CSV"
 
+            elif suffix == ".npz":
+                data_format = "NPZ"
+
         elif dataset_path.is_dir():
             if any(dataset_path.rglob("*.hea")):
                 data_format = "WFDB"
@@ -36,6 +41,9 @@ def create_loader(settings):
 
             elif any(dataset_path.rglob("*.csv")):
                     data_format = "CSV"
+
+            elif any(dataset_path.rglob("*.npz")):
+                data_format = "NPZ"
 
     if data_format == "WFDB":
         return WFDBLoader(
@@ -68,6 +76,21 @@ def create_loader(settings):
 
     if data_format == "CSV":
         return CSVLoader(
+            dataset_path=settings[
+                "dataset_path"
+            ],
+            fs=settings["fs"],
+            channel=settings["channel"],
+            window_seconds=settings[
+                "window_seconds"
+            ],
+            step_seconds=settings[
+                "step_seconds"
+            ],
+        )
+
+    if data_format == "NPZ":
+        return NPZLoader(
             dataset_path=settings[
                 "dataset_path"
             ],

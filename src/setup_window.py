@@ -161,7 +161,7 @@ class SetupWindow(QWidget):
                 "Определить автоматически",
                 "WFDB",
                 "CSV",
-                "NPY / NPZ",
+                "NPY",
                 "EDF",
                 "MAT",
             ]

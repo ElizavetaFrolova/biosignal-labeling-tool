@@ -373,6 +373,57 @@ class SetupWindow(QWidget):
             )
             return
 
+        if not Path(dataset_path).exists():
+            QMessageBox.warning(
+                self,
+                "Ошибка",
+                "Указанный путь к данным не существует.",
+            )
+            return
+
+        if self.channel_combo.count() == 0:
+            QMessageBox.warning(
+                self,
+                "Ошибка",
+                "Не найден ни один подходящий канал.",
+            )
+            return
+
+        if (
+            self.channel_combo.currentText()
+            == "Неподдерживаемая форма"
+        ):
+            QMessageBox.warning(
+                self,
+                "Ошибка",
+                "Выбранный формат сигнала пока не поддерживается.",
+            )
+            return
+
+        if self.fs_spin.value() <= 0:
+            QMessageBox.warning(
+                self,
+                "Ошибка",
+                "Частота дискретизации должна быть больше нуля.",
+            )
+            return
+
+        if self.window_spin.value() <= 0:
+            QMessageBox.warning(
+                self,
+                "Ошибка",
+                "Длина окна должна быть больше нуля.",
+            )
+            return
+
+        if self.step_spin.value() <= 0:
+            QMessageBox.warning(
+                self,
+                "Ошибка",
+                "Шаг окна должен быть больше нуля.",
+            )
+            return
+
         settings = {
             "project_name": project_name,
             "project_parent": project_parent,

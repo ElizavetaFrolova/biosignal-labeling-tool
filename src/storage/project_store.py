@@ -388,5 +388,17 @@ class ProjectStore:
             record_id,
         )
 
+    def get_labeled_records(self):
+        rows = self.connection.execute(
+            """
+            SELECT record_id, class_id, updated_at
+            FROM labels
+            WHERE status = 'labeled'
+            ORDER BY record_id
+            """
+        ).fetchall()
+
+        return rows
+
     def close(self):
         self.connection.close()

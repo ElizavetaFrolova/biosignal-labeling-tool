@@ -14,6 +14,8 @@ from storage.project_store import ProjectStore
 
 from loaders.loader_factory import create_loader
 
+from labeled_records_page import LabeledRecordsPage
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -30,6 +32,8 @@ class MainWindow(QMainWindow):
 
         self.project_store = None
         self.labeling_page = None
+
+        self.labeled_records_page = None
 
         self.stack = QStackedWidget()
         self.setCentralWidget(
@@ -207,6 +211,10 @@ class MainWindow(QMainWindow):
             loader,
         )
 
+        self.labeling_page.show_labeled_requested.connect(
+        self.show_labeled_records
+        )
+
         self.stack.addWidget(
             self.labeling_page
         )
@@ -220,6 +228,57 @@ class MainWindow(QMainWindow):
             self.project_store.close()
 
         event.accept()
+
+    def show_labeled_records(self):
+        if self.labeled_records_page is not None:
+            self.stack.removeWidget(
+                self.labeled_records_page
+            )
+
+            self.labeled_records_page.deleteLater()
+
+        self.labeled_records_page = (
+            LabeledRecordsPage(
+                self.project_store
+            )
+        )
+
+        self.labeled_records_page.back_requested.connect(
+            self.show_labeling_page
+        )
+
+        self.labeled_records_page.open_record_requested.connect(
+            self.open_labeled_record
+        )
+
+        self.stack.addWidget(
+            self.labeled_records_page
+        )
+
+        self.stack.setCurrentWidget(
+            self.labeled_records_page
+        )
+
+
+    def show_labeling_page(self):
+        self.labeling_page.show_current_record()
+
+        self.stack.setCurrentWidget(
+            self.labeling_page
+        )
+
+
+    def open_labeled_record(
+        self,
+        record_id,
+    ):
+        self.labeling_page.open_record(
+            record_id
+        )
+
+        self.stack.setCurrentWidget(
+            self.labeling_page
+        )
 
 
 app = QApplication(

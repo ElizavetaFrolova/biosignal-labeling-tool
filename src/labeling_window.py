@@ -1,7 +1,7 @@
 import numpy as np
 import pyqtgraph as pg
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -15,7 +15,12 @@ from PySide6.QtWidgets import (
 from models.signal_record import SignalRecord
 
 
+
+
 class LabelingWindow(QWidget):
+
+    show_labeled_requested = Signal()
+
     def __init__(self, settings, project_store, loader,):
         super().__init__()
 
@@ -188,25 +193,62 @@ class LabelingWindow(QWidget):
 
         navigation_layout = QHBoxLayout()
 
-        self.previous_button = QPushButton("← Назад")
-        self.skip_button = QPushButton("Пропустить")
+        self.previous_button = QPushButton(
+            "← Назад"
+        )
+
+        labeled_button = QPushButton(
+            "Размеченные записи"
+        )
+
+        self.skip_button = QPushButton(
+            "Пропустить"
+        )
 
         for button in [
             self.previous_button,
+            labeled_button,
             self.skip_button,
         ]:
             button.setMinimumHeight(38)
-            button.setCursor(Qt.CursorShape.PointingHandCursor)
-            button.setStyleSheet(self.secondary_button_style())
 
-        self.previous_button.clicked.connect(self.previous_record)
-        self.skip_button.clicked.connect(self.skip_record)
+            button.setCursor(
+                Qt.CursorShape.PointingHandCursor
+            )
 
-        navigation_layout.addWidget(self.previous_button)
+            button.setStyleSheet(
+                self.secondary_button_style()
+            )
+
+        self.previous_button.clicked.connect(
+            self.previous_record
+        )
+
+        labeled_button.clicked.connect(
+            self.show_labeled_requested.emit
+        )
+
+        self.skip_button.clicked.connect(
+            self.skip_record
+        )
+
+        navigation_layout.addWidget(
+            self.previous_button
+        )
+
+        navigation_layout.addWidget(
+            labeled_button
+        )
+
         navigation_layout.addStretch()
-        navigation_layout.addWidget(self.skip_button)
 
-        main_layout.addLayout(navigation_layout)
+        navigation_layout.addWidget(
+            self.skip_button
+        )
+
+        main_layout.addLayout(
+            navigation_layout
+        )
 
         # ---------------- Переход по ID ----------------
 
@@ -463,3 +505,27 @@ class LabelingWindow(QWidget):
                 background-color: #F8F8F8;
             }
         """
+
+
+
+    def open_record(self, record_id):
+        index = self.loader.find_index(
+            record_id
+        )
+
+        if index is None:
+            QMessageBox.warning(
+                self,
+                "Запись не найдена",
+                f"Запись '{record_id}' "
+                "не найдена в исходном датасете.",
+            )
+            return
+
+        self.current_index = index
+
+        self.project_store.set_current_index(
+            index
+        )
+
+        self.show_current_record()
